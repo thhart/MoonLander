@@ -12,8 +12,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>14</java.version>
         <tensorflow.version>0.4.0</tensorflow.version>
-        <spring-framework.version>5.1.6.RELEASE</spring-framework.version>
+        <spring-framework.version>6.2.0</spring-framework.version>
         <apache.commons.compress>1.22</apache.commons.compress>
+        <ai.djl.version>0.28.0</ai.djl.version>
     </properties>
 
     <distributionManagement>
@@ -105,7 +106,7 @@
         <dependency>
             <groupId>ai.djl</groupId>
             <artifactId>model-zoo</artifactId>
-            <version>0.21.0</version>
+            <version>${ai.djl.version}</version>
             <exclusions>
                 <exclusion>
                     <artifactId>commons-compress</artifactId>
@@ -135,26 +136,26 @@
         <dependency>
             <groupId>ai.djl</groupId>
             <artifactId>api</artifactId>
-            <version>0.21.0</version>
+            <version>${ai.djl.version}</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/ai.djl.mxnet/mxnet-engine -->
         <dependency>
             <groupId>ai.djl.mxnet</groupId>
             <artifactId>mxnet-engine</artifactId>
-            <version>0.21.0</version>
+            <version>${ai.djl.version}</version>
             <scope>runtime</scope>
         </dependency>
-        <dependency>
-            <groupId>ai.djl.mxnet</groupId>
-            <artifactId>mxnet-native-mkl</artifactId>
-            <scope>runtime</scope>
-            <version>1.9.1</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>ai.djl.mxnet</groupId>-->
+<!--            <artifactId>mxnet-native-mkl</artifactId>-->
+<!--            <scope>runtime</scope>-->
+<!--            <version>1.9.1</version>-->
+<!--        </dependency>-->
         <!-- https://mvnrepository.com/artifact/ai.djl.pytorch/pytorch-engine -->
         <dependency>
             <groupId>ai.djl.pytorch</groupId>
             <artifactId>pytorch-engine</artifactId>
-            <version>0.21.0</version>
+            <version>${ai.djl.version}</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/ai.djl.mxnet/mxnet-native-cu110mkl -->
 <!--        <dependency>-->
@@ -165,7 +166,7 @@
         <dependency>
             <groupId>ai.djl.pytorch</groupId>
             <artifactId>pytorch-jni</artifactId>
-            <version>1.13.1-0.21.0</version>
+            <version>1.13.1-${ai.djl.version}</version>
             <scope>runtime</scope>
         </dependency>
 <!--        <dependency>-->
@@ -191,17 +192,17 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
-            <version>21-ea+5</version>
+            <version>19</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
-            <version>21-ea+5</version>
+            <version>19</version>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
-            <version>21-ea+5</version>
+            <version>19</version>
         </dependency>
         <dependency>
             <groupId>com.itth.os</groupId>

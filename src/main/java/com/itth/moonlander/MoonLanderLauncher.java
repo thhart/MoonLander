@@ -3,7 +3,7 @@ package com.itth.moonlander;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.*;
-import javafx.stage.Stage;
+import javafx.stage.*;
 
 public class MoonLanderLauncher extends Application {
 
@@ -14,6 +14,8 @@ public class MoonLanderLauncher extends Application {
 		primaryStage.setScene(scene);
 		primaryStage.setWidth(1000);
 		primaryStage.setHeight(1000);
+		primaryStage.setX(0);
+		primaryStage.setY(Screen.getPrimary().getBounds().getHeight() - primaryStage.getHeight());
 		primaryStage.show();
 	}
 

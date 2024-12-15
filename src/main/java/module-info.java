@@ -17,6 +17,7 @@ module com.itth.moonlander {
 	requires commons.cli;
 	requires progressbar;
 	requires ai.djl.pytorch_engine;
+	exports com.itth.breakout;
 	exports com.itth.moonlander;
 	exports com.itth.moonlander.samples;
 }
