@@ -12,13 +12,20 @@
  */
 package com.itth.breakout;
 
+import java.io.IOException;
+import java.nio.file.Paths;
+
 import ai.djl.Device;
 import ai.djl.Model;
 import ai.djl.basicmodelzoo.basic.Mlp;
 import ai.djl.modality.rl.agent.QAgent;
 import ai.djl.modality.rl.agent.RlAgent;
 import ai.djl.modality.rl.env.RlEnv.Step;
-import ai.djl.ndarray.*;
+import ai.djl.ndarray.BaseNDManager;
+import ai.djl.ndarray.NDArray;
+import ai.djl.ndarray.NDArrays;
+import ai.djl.ndarray.NDList;
+import ai.djl.ndarray.NDManager;
 import ai.djl.ndarray.types.DataType;
 import ai.djl.ndarray.types.Shape;
 import ai.djl.nn.Activation;
@@ -35,15 +42,12 @@ import ai.djl.training.loss.Loss;
 import ai.djl.training.optimizer.Adam;
 import ai.djl.training.tracker.CosineTracker;
 import ai.djl.training.tracker.CyclicalTracker;
-import ai.djl.training.tracker.LinearTracker;
+import ai.djl.training.tracker.PolynomialDecayTracker;
 import ai.djl.training.tracker.Tracker;
 import com.itth.moonlander.samples.TicTacToe;
 import me.tongfei.progressbar.ProgressBar;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.Paths;
 
 /**
  An example of training reinforcement learning using {@link TicTacToe} and a {@link QAgent}.
@@ -59,6 +63,46 @@ public final class BreakoutTrainer {
 
 
 	public static SequentialBlock createBlock() {
+	    return new SequentialBlock()
+	        // Preprocessing: Concatenate the board state, turn, and action into one Tensor
+	        .add(arrays -> {
+	            NDArray board = arrays.get(0); // Shape(N, board_size)
+	            NDArray turn = arrays.get(1).reshape(-1, 1); // Shape(N, 1)
+	            NDArray action = arrays.get(2).reshape(-1, 1); // Shape(N, 1)
+
+	            // Concatenate to a combined vector
+	            NDArray combined = NDArrays.concat(new NDList(board, turn, action), 1);
+	            return new NDList(combined.toType(DataType.FLOAT32, true));
+	        })
+
+	        // Input Layer: Accept processed state, map to a higher dimension
+	        .add(Linear.builder().setUnits(512).build()) // Fully connected input layer with 512 units
+	        .add(BatchNorm.builder().build())           // Normalize inputs, stabilize training
+	        .add(Activation::relu)                      // ReLU for non-linearity
+	        .add(Dropout.builder().optRate(0.2f).build()) // Reduce overfitting, 20% dropout rate
+
+	        // Hidden Layer 1: Process features with reduced dimensionality
+	        .add(Linear.builder().setUnits(256).build())
+	        .add(BatchNorm.builder().build())
+	        .add(Activation::relu)
+	        .add(Dropout.builder().optRate(0.2f).build())
+
+	        // Hidden Layer 2: Continue extracting abstract features
+	        .add(Linear.builder().setUnits(128).build())
+	        .add(BatchNorm.builder().build())
+	        .add(Activation::relu)
+	        .add(Dropout.builder().optRate(0.2f).build())
+
+	        // Hidden Layer 3: Enhanced abstraction with smaller hidden size
+	        .add(Linear.builder().setUnits(64).build())
+	        .add(BatchNorm.builder().build())
+	        .add(Activation::relu)
+
+	        // Output Layer: Predict Q-value for the state-action pair
+	        .add(Linear.builder().setUnits(1).build()); // Single output (Q-value)
+	}
+
+	public static SequentialBlock createBlockLegacy() {
 	    return new SequentialBlock()
 	        .add(arrays -> {
 	            NDArray board = arrays.get(0); // Shape(N, board_size)
@@ -110,6 +154,24 @@ public final class BreakoutTrainer {
 				//.setBaseValue(0.001F) // last working with cyclic tracker 10/04/23
 				.setBaseValue(0.1F)
 				.optFinalValue(0.0001F).build();
+		Tracker lrWarmupTracker =
+		    Tracker.warmUp()
+		        .optWarmUpBeginValue(0.0001F) // Start with a small learning rate
+		        .optWarmUpSteps(1000)         // Gradually increase over 1,000 steps
+		        .setMainTracker(cosineTracker) // Converge to the cosine schedule
+		        .build();
+
+		return new DefaultTrainingConfig(Loss.l2Loss())
+		    .addTrainingListeners(TrainingListener.Defaults.basic())
+		    .optOptimizer(Adam.builder().optLearningRateTracker(lrWarmupTracker).build());
+	}
+
+	public static DefaultTrainingConfig createConfigLegacy(int epoch, int gamesPerEpoch) {
+		final CosineTracker cosineTracker = Tracker.cosine()
+				.setMaxUpdates(epoch * gamesPerEpoch)
+				//.setBaseValue(0.001F) // last working with cyclic tracker 10/04/23
+				.setBaseValue(0.1F)
+				.optFinalValue(0.0001F).build();
 		//Tracker rateTracker = Tracker.fixed(0.001F);
 		//final Tracker cyclicalTracker = Tracker.warmUp()
 		//				.optWarmUpBeginValue(0.001F).optWarmUpMode(Mode.LINEAR).optWarmUpSteps(512)
@@ -128,13 +190,13 @@ public final class BreakoutTrainer {
 	public static TrainingResult runExample(Breakout moonLander) throws IOException {
 		//int epoch = 512;
 		int epoch = 128;
-		int batchSize = 64;
-		int replayBufferSize = 64;
+		int batchSize = 1024;
+		int replayBufferSize = 1024 * 1024;
 		//int gamesPerEpoch = Math.toIntExact(1024);
 		int gamesPerEpoch = Math.toIntExact(16);
 		// Validation is deterministic, thus one game is enough
 		int validationGamesPerEpoch = 1;
-		float rewardDiscount = 0.2F;
+		float rewardDiscount = 0.9F;
 		//Engine engine = Engine.getEngine("PyTorch");
 		//System.out.println("Using backend engine: " + engine.getEngineName());
 		//System.out.println("Found GPU: " + engine.getGpuCount());
@@ -157,10 +219,11 @@ public final class BreakoutTrainer {
 						// Constructs the agent to train and play with
 						RlAgent agent = new QAgent(trainer, rewardDiscount);
 						Tracker exploreRate =
-								LinearTracker.builder()
-										.setBaseValue(0.90f)
-										.optSlope(-.9f / (epoch * gamesPerEpoch * 100))
-										.optMinValue(0.1f)
+								PolynomialDecayTracker.builder()
+										.setBaseValue(1.0f)
+										.setEndLearningRate(0.1F)
+									.setDecaySteps(epoch * gamesPerEpoch * 128)
+									.optPower(0.5F)
 										.build();
 						ConstantTracker constantTracker = new ConstantTracker(0.9F);
 						CyclicalTracker exploreCyclic =
@@ -170,7 +233,7 @@ public final class BreakoutTrainer {
 										.build();
 						Tracker tracker = exploreRate;
 						agent = new com.itth.moonlander.EpsilonGreedy(agent, tracker);
-
+						float bestValidationWinRate = 0;
 						float validationWinRate = 0;
 						float trainWinRate = 0;
 							for (int i = 0; i < epoch; i++) {
@@ -191,8 +254,11 @@ public final class BreakoutTrainer {
 										//System.err.println("Action: " + ((com.itth.moonlander.EpsilonGreedy) agent).getMap());
 										//System.err.println("epsilon: " + exploreCyclic.getNewValue(0));
 										//manager.debugDump(2);
+										if(result > bestValidationWinRate) {
+											save(model);
+											bestValidationWinRate = result;
+										}
 									}
-									save(model);
 								}
 								trainWinRate = (float)trainingWins / gamesPerEpoch;
 								logger.info("Training wins: {}", trainWinRate);

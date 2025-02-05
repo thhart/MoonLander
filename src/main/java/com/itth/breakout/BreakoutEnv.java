@@ -1,5 +1,7 @@
 package com.itth.breakout;
 
+import java.time.Duration;
+
 import ai.djl.modality.rl.ActionSpace;
 import ai.djl.modality.rl.LruReplayBuffer;
 import ai.djl.modality.rl.ReplayBuffer;
@@ -10,8 +12,6 @@ import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
 import com.itth.os.realtimechart.RealTimeChart;
 import com.itth.os.realtimechart.RealTimeChart.RealTimeEvent;
-
-import java.time.Duration;
 
 public class BreakoutEnv implements RlEnv {
   protected final NDManager manager;
@@ -198,8 +198,38 @@ public class BreakoutEnv implements RlEnv {
       }
       return observation;
     }
-
     public float getReward(NDList action) {
+      double reward;
+      double distance = Math.abs(paddleX - ballX); // Distance between paddle and ball
+      int move = (int) action.singletonOrThrow().getFloat(); // Paddle action: 0 = stay, 1 = move left, 2 = move right
+
+      if (distance < paddleW / 2) {
+        // Ball successfully hit with paddle: reward based on how close it was to the paddle's center
+        reward = (paddleW / 2 - distance) / (paddleW / 2);
+      } else {
+        // Ball missed (negative reward): penalize based on normalized paddle-ball distance
+        reward = -Math.min(1.0, distance / (paddleW * 2));
+      }
+
+      // Penalize incorrect movements (based on ball-paddle relation)
+      if (ballX < paddleX && move == 2) {
+        // Ball is to the left, but paddle moved right
+        reward -= 0.1;
+      } else if (ballX > paddleX && move == 1) {
+        // Ball is to the right, but paddle moved left
+        reward -= 0.1;
+      } else if (Math.abs(ballX - paddleX) > paddleW && move == 0) {
+        // Ball far from paddle, but no movement (stay action)
+        reward -= 0.2;
+      }
+
+      // Send scaled reward to live chart for debugging/logging
+      RealTimeChart.send(RealTimeEvent.of("Reward", Duration.ofMillis((long) (reward * 100))));
+
+      // Return the scaled reward
+      return (float) reward;
+    }
+    public float getRewardLegacy(NDList action) {
       double reward;
       if (Math.abs(paddleX - ballX) < paddleW / 2) {
         reward = (paddleW - Math.abs(paddleX - ballX))/10;

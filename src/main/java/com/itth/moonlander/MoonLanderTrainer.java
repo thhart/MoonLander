@@ -82,13 +82,13 @@ public final class MoonLanderTrainer {
 	public static TrainingResult runExample(MoonLander moonLander) throws IOException {
 		//int epoch = 512;
 		int epoch = 128;
-		int batchSize = 24;
-		int replayBufferSize = 256 * 256;
+		int batchSize = 64;
+		int replayBufferSize = 64 * 64;
 		//int gamesPerEpoch = Math.toIntExact(1024);
 		int gamesPerEpoch = Math.toIntExact(16);
 		// Validation is deterministic, thus one game is enough
 		int validationGamesPerEpoch = 1;
-		float rewardDiscount = 0.4f;
+		float rewardDiscount = 0.9f;
 		//Engine engine = Engine.getEngine("PyTorch");
 		//System.out.println("Using backend engine: " + engine.getEngineName());
 		//System.out.println("Found GPU: " + engine.getGpuCount());
